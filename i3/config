@@ -22,6 +22,7 @@ font pango:monospace 8
 # Start XDG autostart .desktop files using dex. See also
 # https://wiki.archlinux.org/index.php/XDG_Autostart
 exec --no-startup-id dex --autostart --environment i3
+exec_always --no-startup-id feh --bg-fill ~/Pictures/wallpaper.jpg
 
 # The combination of xss-lock, nm-applet and pactl is a popular choice, so
 # they are included here as an example. Modify as you see fit.
@@ -44,6 +45,9 @@ bindsym Ctrl+Print exec --no-startup-id maim --format=png | xclip -selection cli
 bindsym Ctrl+$mod+Print exec --no-startup-id maim --format=png --window $(xdotool getactivewindow) | xclip -selection clipboard -t image/png
 bindsym Ctrl+Shift+Print exec --no-startup-id maim --format=png --select | xclip -selection clipboard -t image/png
 
+# enable touchpad tap-to-click
+exec_always --no-startup-id xinput set-prop "SYNA30BB:00 06CB:CE07 Touchpad" "libinput Tapping Enabled" 1
+
 #remap capslock to backspace
 exec_always --no-startup-id setxkbmap -option caps:backspace -option shift:both_capslock
 exec_always --no-startup-id xmodmap -e "clear Lock"
@@ -54,6 +58,10 @@ bindsym XF86AudioRaiseVolume exec --no-startup-id pactl set-sink-volume @DEFAULT
 bindsym XF86AudioLowerVolume exec --no-startup-id pactl set-sink-volume @DEFAULT_SINK@ -10% && $refresh_i3status
 bindsym XF86AudioMute exec --no-startup-id pactl set-sink-mute @DEFAULT_SINK@ toggle && $refresh_i3status
 bindsym XF86AudioMicMute exec --no-startup-id pactl set-source-mute @DEFAULT_SOURCE@ toggle && $refresh_i3status
+
+# Brightness controls
+bindsym XF86MonBrightnessUp exec --no-startup-id brightnessctl set +10% && $refresh_i3status
+bindsym XF86MonBrightnessDown exec --no-startup-id brightnessctl set 10%- && $refresh_i3status
 
 exec --no-startup-id sh -c 'pgrep -x volumeicon || volumeicon'
 bindsym $mod+n exec --no-startup-id nautilus
@@ -74,13 +82,15 @@ bindsym $mod+Return exec i3-sensible-terminal
 # kill focused window
 bindsym $mod+Shift+q kill
 
-# start dmenu (a program launcher)
-bindsym $mod+d exec --no-startup-id dmenu_run
-# A more modern dmenu replacement is rofi:
-# bindcode $mod+40 exec "rofi -modi drun,run -show drun"
-# There also is i3-dmenu-desktop which only displays applications shipping a
-# .desktop file. It is a wrapper around dmenu, so you need that installed.
-# bindcode $mod+40 exec --no-startup-id i3-dmenu-desktop
+# lock screen
+bindsym $mod+Escape exec i3lock
+
+# screen layouts
+bindsym $mod+Ctrl+1 exec --no-startup-id sh ~/.config/screenlayouts/home_monitors_layout.sh
+bindsym $mod+Ctrl+2 exec --no-startup-id sh ~/.config/screenlayouts/office_monitors_layout.sh
+
+# start rofi (application launcher)
+bindsym $mod+d exec --no-startup-id rofi -show drun
 
 # change focus
 bindsym $mod+h focus left
@@ -96,8 +106,8 @@ bindsym $mod+Right focus right
 
 # move focused window
 bindsym $mod+shift+h move left
-bindsym $mod+shift+k move down
-bindsym $mod+shift+j move up
+bindsym $mod+shift+k move up
+bindsym $mod+shift+j move down
 bindsym $mod+shift+l move right
 
 # alternatively, you can use the cursor keys:
@@ -136,7 +146,7 @@ set $ws1 "1:Terminal"
 set $ws2 "2:Brave"
 set $ws3 "3:Cursor"
 set $ws4 "4:Nautilus"
-set $ws5 "5"
+set $ws5 "5:Mattermost"
 set $ws6 "6"
 set $ws7 "7"
 set $ws8 "8"
@@ -172,9 +182,14 @@ assign [class="^(?i)xfce4-terminal|gnome-terminal|kitty|alacritty|termite$"] wor
 assign [class="^(?i)brave$"] workspace number $ws2
 assign [class="^(?i)cursor$"] workspace number $ws3
 assign [class="^(?i)nautilus$"] workspace number $ws4
+assign [class="^(?i)mattermost$"] workspace number $ws5
 
 exec --no-startup-id i3-msg 'workspace $ws1; exec i3-sensible-terminal'
 exec --no-startup-id i3-msg 'workspace $ws3; exec cursor'; i3-msg 'workspace $ws4; exec nautilus'
+exec --no-startup-id i3-msg 'workspace $ws5; exec mattermost-desktop'
+
+# Move workspace to next monitor
+bindsym $mod+Shift+m move workspace to output next
 
 # reload the configuration file
 bindsym $mod+Shift+c reload
@@ -213,5 +228,18 @@ bindsym $mod+r mode "resize"
 # Start i3bar to display a workspace bar (plus the system information i3status
 # finds out, if available)
 bar {
-        status_command i3status
+        status_command i3status | /home/hassan/.config/i3/i3status-color.py
+        font pango:JetBrainsMono Nerd Font 10
+
+        colors {
+                background #1a1b26
+                statusline #c0caf5
+                separator  #3b4261
+
+                #                  border   background text
+                focused_workspace  #7aa2f7  #7aa2f7    #1a1b26
+                active_workspace   #3b4261  #3b4261    #c0caf5
+                inactive_workspace #1a1b26  #1a1b26    #565f89
+                urgent_workspace   #f7768e  #f7768e    #1a1b26
+        }
 }
