@@ -64,7 +64,14 @@ bindsym XF86MonBrightnessUp exec --no-startup-id brightnessctl set +10% && $refr
 bindsym XF86MonBrightnessDown exec --no-startup-id brightnessctl set 10%- && $refresh_i3status
 
 exec --no-startup-id sh -c 'pgrep -x volumeicon || volumeicon'
+exec --no-startup-id playerctld daemon
 bindsym $mod+n exec --no-startup-id nautilus
+
+# Toggle nightmode (warm screen via redshift)
+bindsym $mod+Shift+n exec --no-startup-id ~/.config/i3/nightmode-toggle.sh
+
+# Play/pause media — playerctld tracks the most-recently-active MPRIS player
+bindsym $mod+p exec --no-startup-id playerctl play-pause
 
 #gaps
 smart_gaps on
@@ -84,6 +91,9 @@ bindsym $mod+Shift+q kill
 
 # lock screen
 bindsym $mod+Escape exec i3lock
+
+# suspend
+bindsym Ctrl+Shift+Escape exec --no-startup-id systemctl suspend
 
 # screen layouts
 bindsym $mod+Ctrl+1 exec --no-startup-id sh ~/.config/screenlayouts/home_monitors_layout.sh
@@ -165,6 +175,9 @@ bindsym $mod+8 workspace number $ws8
 bindsym $mod+9 workspace number $ws9
 bindsym $mod+0 workspace number $ws10
 
+# switch between recent workspaces
+bindsym $mod+q workspace back_and_forth
+
 # move focused container to workspace
 bindsym $mod+Shift+1 move container to workspace number $ws1
 bindsym $mod+Shift+2 move container to workspace number $ws2
@@ -224,6 +237,10 @@ mode "resize" {
 }
 
 bindsym $mod+r mode "resize"
+
+# Scratchpad
+bindsym $mod+minus move scratchpad
+bindsym $mod+plus scratchpad show
 
 # Start i3bar to display a workspace bar (plus the system information i3status
 # finds out, if available)
