@@ -18,21 +18,27 @@ sudo apt update && sudo apt install -y \
     xclip \
     xdotool \
     xinput \
+    autocutsel \
+    picom \
+    xfce4-clipman-plugin \
     volumeicon-alsa \
     fonts-jetbrains-mono \
     stow \
     playerctl
 
 cd "$(dirname "$(readlink -f "$0")")"
-for pkg in i3 i3status hypr screenlayouts tmux; do
-    if [ "$pkg" = tmux ]; then
-        # Keep ~/.tmux and ~/.config/nvim-treemux as real directories so TPM,
-        # compiled plugins, and Neovim runtime files do not land in this repo.
-        stow --no-folding -v -t "$HOME" "$pkg"
-    elif [ -d "$pkg" ]; then
-        stow -v -t "$HOME" "$pkg"
-    fi
+# --no-folding links individual files rather than whole directories, so shared
+# dirs like ~/.local/bin and ~/.tmux stay real and their other contents (TPM
+# plugins, Neovim runtime files, unrelated binaries) never land in this repo.
+for pkg in i3 i3status hypr screenlayouts xprofile git rofi; do
+    [ -d "$pkg" ] && stow -v -t "$HOME" "$pkg"
 done
+for pkg in tmux battery-monitor; do
+    [ -d "$pkg" ] && stow --no-folding -v -t "$HOME" "$pkg"
+done
+
+systemctl --user daemon-reload
+systemctl --user enable --now battery-monitor.service
 
 treemux_venv="$HOME/.local/share/treemux/venv"
 if [ ! -x "$treemux_venv/bin/python" ]; then
@@ -51,3 +57,6 @@ fi
 echo
 echo "Done. bashrc intentionally not stowed — review bashrc/.bashrc and stow manually if desired:"
 echo "  stow -v -t \"\$HOME\" bashrc"
+echo
+echo "Root-owned configs (keyd keymaps, logind lid/power drop-ins) are separate:"
+echo "  sudo ./system/install-system.sh"
