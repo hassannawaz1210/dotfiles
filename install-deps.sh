@@ -21,6 +21,7 @@ sudo apt update && sudo apt install -y \
     autocutsel \
     picom \
     xfce4-clipman-plugin \
+    fonts-font-awesome \
     volumeicon-alsa \
     fonts-jetbrains-mono \
     stow \

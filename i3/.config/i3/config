@@ -266,7 +266,7 @@ bindsym $mod+plus scratchpad show
 # finds out, if available)
 bar {
         status_command ~/.config/i3/i3status-color.py
-        font pango:JetBrainsMono Nerd Font 10
+        font pango:FontAwesome, JetBrains Mono 10
 
         colors {
                 background #1a1b26
