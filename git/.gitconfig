@@ -1,0 +1,13 @@
+[credential]
+	helper = store
+[user]
+	email = hassannawaz1210@gmail.com
+	name = hassan
+[credential "https://github.com"]
+	helper = 
+	helper = !/usr/bin/gh auth git-credential
+[credential "https://gist.github.com"]
+	helper = 
+	helper = !/usr/bin/gh auth git-credential
+[init]
+	DefaultBranch = main
