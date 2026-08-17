@@ -21,8 +21,10 @@ font pango:monospace 8
 
 # Start XDG autostart .desktop files using dex. See also
 # https://wiki.archlinux.org/index.php/XDG_Autostart
+# compositor: vsync to kill screen tearing (modesetting has no TearFree)
+exec_always --no-startup-id sh -c 'pgrep -x picom || picom --vsync'
 exec --no-startup-id dex --autostart --environment i3
-exec_always --no-startup-id feh --bg-fill ~/Pictures/wallpaper.jpg
+exec_always --no-startup-id feh --bg-fill ~/wallpapers/wallhaven-1qdz21_1920x1080.png
 
 # The combination of xss-lock, nm-applet and pactl is a popular choice, so
 # they are included here as an example. Modify as you see fit.
@@ -65,6 +67,11 @@ bindsym XF86MonBrightnessDown exec --no-startup-id brightnessctl set 10%- && $re
 
 exec --no-startup-id sh -c 'pgrep -x volumeicon || volumeicon'
 exec --no-startup-id playerctld daemon
+exec_always --no-startup-id sh -c 'pgrep -x xfce4-clipman || exec xfce4-clipman'
+# Keep mouse selections (PRIMARY) and the regular clipboard synchronized.
+exec --no-startup-id autocutsel -fork -selection PRIMARY
+exec --no-startup-id autocutsel -fork -selection CLIPBOARD
+bindsym $mod+grave exec --no-startup-id xfce4-popup-clipman
 bindsym $mod+n exec --no-startup-id nautilus
 
 # Toggle nightmode (warm screen via redshift)
@@ -72,6 +79,8 @@ bindsym $mod+Shift+n exec --no-startup-id ~/.config/i3/nightmode-toggle.sh
 
 # Play/pause media — playerctld tracks the most-recently-active MPRIS player
 bindsym $mod+p exec --no-startup-id playerctl play-pause
+bindsym $mod+bracketleft exec --no-startup-id playerctl previous
+bindsym $mod+bracketright exec --no-startup-id playerctl next
 
 #gaps
 smart_gaps on
@@ -93,11 +102,13 @@ bindsym $mod+Shift+q kill
 bindsym $mod+Escape exec i3lock
 
 # suspend
-bindsym Ctrl+Shift+Escape exec --no-startup-id systemctl suspend
+bindsym $mod+Ctrl+Escape exec --no-startup-id systemctl suspend
 
 # screen layouts
 bindsym $mod+Ctrl+1 exec --no-startup-id sh ~/.config/screenlayouts/home_monitors_layout.sh
 bindsym $mod+Ctrl+2 exec --no-startup-id sh ~/.config/screenlayouts/office_monitors_layout.sh
+bindsym $mod+Ctrl+3 exec --no-startup-id sh ~/.config/screenlayouts/vertical_monitors_layout.sh
+bindsym $mod+Ctrl+d exec --no-startup-id sh ~/.config/screenlayouts/default_single_layout.sh
 
 # start rofi (application launcher)
 bindsym $mod+d exec --no-startup-id rofi -show drun
@@ -146,6 +157,10 @@ bindsym $mod+Shift+space floating toggle
 # change focus between tiling / floating windows
 bindsym $mod+space focus mode_toggle
 
+# Zenbar: global URL, Google, and YouTube search for Zen Browser
+bindsym --release $mod+Ctrl+space exec --no-startup-id /home/hassan/personal/zenbar/bin/zenbar
+bindsym --release Mod4+Ctrl+space exec --no-startup-id /home/hassan/personal/zenbar/bin/zenbar
+
 # focus the parent container
 bindsym $mod+a focus parent
 
@@ -175,8 +190,13 @@ bindsym $mod+8 workspace number $ws8
 bindsym $mod+9 workspace number $ws9
 bindsym $mod+0 workspace number $ws10
 
+# Windows-style Alt+Tab: hold $mod, tap Tab to cycle windows, release to select.
+# rofi shows per-window icon + title (closest to a "preview" i3/X11 can do).
+bindsym $mod+Tab exec --no-startup-id "rofi -show window -show-icons -kb-accept-entry !Alt_L,!Alt+Tab,Return -kb-row-down Alt+Tab -kb-row-up Alt+ISO_Left_Tab"
+
 # switch between recent workspaces
-bindsym $mod+q workspace back_and_forth
+bindsym $mod+q exec --no-startup-id ~/.config/i3/workspace-anchor.sh toggle
+bindsym $mod+m exec --no-startup-id ~/.config/i3/workspace-anchor.sh mark
 
 # move focused container to workspace
 bindsym $mod+Shift+1 move container to workspace number $ws1
@@ -245,7 +265,7 @@ bindsym $mod+plus scratchpad show
 # Start i3bar to display a workspace bar (plus the system information i3status
 # finds out, if available)
 bar {
-        status_command i3status | /home/hassan/.config/i3/i3status-color.py
+        status_command /home/hassan/.config/i3/i3status-color.py
         font pango:JetBrainsMono Nerd Font 10
 
         colors {
