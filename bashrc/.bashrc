@@ -165,11 +165,11 @@ masscall() {
 #   masscallsip 20 500     # 20cps, 500 calls
 masscallsip() {
   RATE="${1:-10}" MAX="${2:-300}" DID="${3:-18005550100}" CONCURRENT="${4:-50}" \
-    bash /home/hassan/ringba/ringba-backend/tests/sipp/masscall_sip.sh
+    bash "$HOME/ringba/ringba-backend/tests/sipp/masscall_sip.sh"
 }
-eval "$(/home/hassan/.local/bin/mise activate bash)"
+command -v mise >/dev/null && eval "$(mise activate bash)"
 export EDITOR=nvim
-alias ringba-ip='/home/hassan/ringba/ringba-ip.sh'
+alias ringba-ip="$HOME/ringba/ringba-ip.sh"
 
 # internet speed test via Cloudflare (parallel streams)
 speedtest() {

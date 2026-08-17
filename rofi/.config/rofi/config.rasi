@@ -1,2 +1,5 @@
-//@theme "/home/hassan/.local/share/rofi/themes/simple-tokyonight.rasi"
-@theme "/home/hassan/.local/share/rofi/themes/squared-nord.rasi"
+// Themes resolve from rofi's search path, which includes
+// $XDG_DATA_HOME/rofi/themes (~/.local/share/rofi/themes) where this repo
+// stows them — so a bare name works and no absolute path is needed.
+//@theme "simple-tokyonight"
+@theme "squared-nord"
