@@ -4,6 +4,7 @@ import sys
 import glob
 import json
 import signal
+import shutil
 import threading
 import subprocess
 
@@ -84,7 +85,26 @@ def run(cmd):
     # Redirect output to DEVNULL: anything a command prints to stdout would
     # otherwise corrupt the i3bar JSON protocol stream (our stdout) and crash
     # the bar — brightnessctl prints by default.
-    subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return subprocess.run(
+        cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+    ).returncode == 0
+
+
+def change_volume(amount):
+    """Adjust the default sink with the audio tool available on this system."""
+    if shutil.which("wpctl"):
+        return run(["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", amount])
+    if shutil.which("pactl"):
+        return run(["pactl", "set-sink-volume", "@DEFAULT_SINK@", amount])
+    return False
+
+
+def toggle_mute():
+    if shutil.which("wpctl"):
+        return run(["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"])
+    if shutil.which("pactl"):
+        return run(["pactl", "set-sink-mute", "@DEFAULT_SINK@", "toggle"])
+    return False
 
 
 def handle_click(event):
@@ -92,11 +112,11 @@ def handle_click(event):
     button = event.get("button", 0)
     if name == "volume":
         if button == 4:    # wheel up
-            run(["pactl", "set-sink-volume", "@DEFAULT_SINK@", f"+{VOLUME_STEP}%"])
+            change_volume(f"{VOLUME_STEP}%+")
         elif button == 5:  # wheel down
-            run(["pactl", "set-sink-volume", "@DEFAULT_SINK@", f"-{VOLUME_STEP}%"])
+            change_volume(f"{VOLUME_STEP}%-")
         elif button == 1:  # left click toggles mute
-            run(["pactl", "set-sink-mute", "@DEFAULT_SINK@", "toggle"])
+            toggle_mute()
         else:
             return
         refresh()
