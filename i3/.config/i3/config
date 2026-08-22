@@ -47,8 +47,8 @@ bindsym Ctrl+Print exec --no-startup-id maim --format=png | xclip -selection cli
 bindsym Ctrl+$mod+Print exec --no-startup-id maim --format=png --window $(xdotool getactivewindow) | xclip -selection clipboard -t image/png
 bindsym Ctrl+Shift+Print exec --no-startup-id maim --format=png --select | xclip -selection clipboard -t image/png
 
-# enable touchpad tap-to-click
-exec_always --no-startup-id xinput set-prop "SYNA30BB:00 06CB:CE07 Touchpad" "libinput Tapping Enabled" 1
+# Enable tap-to-click on whichever XInput node exposes the tapping property.
+exec_always --no-startup-id ~/.config/i3/enable-touchpad-tapping.sh
 
 #remap capslock to backspace
 exec_always --no-startup-id setxkbmap -option caps:backspace -option shift:both_capslock
