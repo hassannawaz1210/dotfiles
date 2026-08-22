@@ -34,3 +34,11 @@ install -Dm644 logind.conf.d/lid.conf /etc/systemd/logind.conf.d/lid.conf
 install -Dm644 logind.conf.d/power-button.conf /etc/systemd/logind.conf.d/power-button.conf
 echo "logind drop-ins installed. They apply on next boot."
 echo "To apply now (WILL likely end your session): systemctl restart systemd-logind"
+
+# Ubuntu grants backlight writes to the video group. Add the invoking desktop
+# user so brightnessctl works from i3bar after their next login.
+desktop_user="${SUDO_USER:-}"
+if [ -n "$desktop_user" ] && ! id -nG "$desktop_user" | grep -qw video; then
+    usermod -aG video "$desktop_user"
+    echo "brightness: added $desktop_user to video; log out and back in to apply"
+fi
