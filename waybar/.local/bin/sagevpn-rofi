@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -u
+
+readonly SAGEVPN="/home/hassan/.local/bin/sagevpn"
+
+if output="$($SAGEVPN toggle 2>&1)"; then
+  if [[ "$output" == *"disconnected"* ]]; then
+    summary="SageTeck VPN disconnected"
+  else
+    summary="SageTeck VPN connected"
+  fi
+  notify-send --app-name="SageTeck VPN" --icon=network-vpn "$summary" "$output"
+else
+  result=$?
+  notify-send --urgency=critical --app-name="SageTeck VPN" --icon=dialog-error \
+    "SageTeck VPN toggle failed" "$output"
+  exit "$result"
+fi

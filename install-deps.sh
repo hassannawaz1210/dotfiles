@@ -34,7 +34,7 @@ cd "$(dirname "$(readlink -f "$0")")"
 for pkg in i3 i3status hypr screenlayouts xprofile git rofi; do
     [ -d "$pkg" ] && stow -v -t "$HOME" "$pkg"
 done
-for pkg in tmux battery-monitor; do
+for pkg in tmux battery-monitor zellij niri waybar; do
     [ -d "$pkg" ] && stow --no-folding -v -t "$HOME" "$pkg"
 done
 

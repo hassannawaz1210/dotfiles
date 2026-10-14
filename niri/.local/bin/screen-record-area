@@ -1,0 +1,54 @@
+#!/bin/sh
+
+user_id="$(id -u)"
+pid_file="${XDG_RUNTIME_DIR:-/tmp}/wf-recorder-area-${user_id}.pid"
+output_dir="/home/hassan/Videos/Screen Recordings"
+
+# Running the shortcut again stops only the recorder launched by this script.
+if [ -f "$pid_file" ]; then
+    read -r recorder_pid < "$pid_file"
+    case "$recorder_pid" in
+        ''|*[!0-9]*) ;;
+        *)
+            if kill -0 "$recorder_pid" 2>/dev/null &&
+               [ "$(cat "/proc/$recorder_pid/comm" 2>/dev/null)" = "wf-recorder" ]; then
+                kill -INT "$recorder_pid"
+                notify-send "Screen recording" "Stopping recording…" 2>/dev/null || true
+                exit 0
+            fi
+            ;;
+    esac
+    rm -f "$pid_file"
+fi
+
+geometry="$(slurp)" || exit 0
+mkdir -p "$output_dir" || exit 1
+output_file="$output_dir/Recording from $(date '+%Y-%m-%d %H-%M-%S').mp4"
+
+set -- -g "$geometry" -f "$output_file"
+default_sink="$(pactl get-default-sink 2>/dev/null || true)"
+if [ -n "$default_sink" ]; then
+    set -- --audio="${default_sink}.monitor" "$@"
+fi
+
+wf-recorder "$@" &
+recorder_pid=$!
+printf '%s\n' "$recorder_pid" > "$pid_file"
+
+cleanup() {
+    if [ -f "$pid_file" ] && [ "$(cat "$pid_file")" = "$recorder_pid" ]; then
+        rm -f "$pid_file"
+    fi
+}
+trap cleanup EXIT HUP TERM
+
+notify-send "Screen recording started" \
+    "Press Ctrl+Shift+Print again to stop" 2>/dev/null || true
+
+wait "$recorder_pid"
+
+if [ -s "$output_file" ]; then
+    notify-send "Screen recording saved" "$output_file" 2>/dev/null || true
+else
+    notify-send "Screen recording failed" "No video was saved" 2>/dev/null || true
+fi

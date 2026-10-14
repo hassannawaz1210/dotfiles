@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# nmtui-live: run nmtui's "Activate a connection" screen with a live AP list.
+#
+# NetworkManager configures wpa_supplicant with bgscan=simple:30:-70:86400, so
+# while connected above -70 dBm the scan cache is only refreshed once a day and
+# nmtui's network list appears frozen. This forces a periodic rescan for as long
+# as nmtui is open, then cleans the rescanner up.
+
+set -uo pipefail
+
+INTERVAL="${NMTUI_LIVE_INTERVAL:-10}"
+
+if ! command -v nmtui >/dev/null 2>&1; then
+    echo "nmtui-live: nmtui is not installed" >&2
+    exit 127
+fi
+if ! command -v nmcli >/dev/null 2>&1; then
+    echo "nmtui-live: nmcli is not installed" >&2
+    exit 127
+fi
+
+if ! nmcli -t -f RUNNING general status >/dev/null 2>&1; then
+    echo "nmtui-live: cannot talk to NetworkManager (is the service running?)" >&2
+    exit 1
+fi
+
+# Fail loudly if there is no Wi-Fi device to scan, rather than silently
+# behaving exactly like plain nmtui.
+if ! nmcli -t -f TYPE device status 2>/dev/null | grep -qx wifi; then
+    echo "nmtui-live: no Wi-Fi device found; falling back to plain nmtui" >&2
+    exec nmtui "$@"
+fi
+
+rescan_loop() {
+    while true; do
+        # Rescan is rate-limited by NM and fails while one is in flight or the
+        # radio is busy; that is expected, so only unexpected noise is surfaced.
+        err=$(nmcli device wifi rescan 2>&1 >/dev/null)
+        if [ -n "$err" ] && ! printf '%s' "$err" \
+            | grep -qiE 'not allowed immediately|scanning not allowed|already scanning'; then
+            printf 'nmtui-live: rescan failed: %s\n' "$err" >> "${TMPDIR:-/tmp}/nmtui-live.log"
+        fi
+        sleep "$INTERVAL"
+    done
+}
+
+rescan_loop &
+RESCAN_PID=$!
+
+cleanup() {
+    kill "$RESCAN_PID" 2>/dev/null
+    wait "$RESCAN_PID" 2>/dev/null
+}
+trap cleanup EXIT INT TERM
+
+nmtui "$@"
+status=$?
+exit "$status"

@@ -1,0 +1,194 @@
+{
+  "layer": "top",
+  "position": "bottom",
+  "height": 32,
+  "spacing": 4,
+  "margin-bottom": 4,
+  "margin-left": 6,
+  "margin-right": 6,
+
+  "modules-left": ["niri/workspaces", "niri/window"],
+  "modules-center": ["custom/spotify", "custom/spotify-heart", "clock"],
+  "modules-right": ["tray", "custom/lazyssh", "custom/staging-monitor", "cpu", "memory", "disk", "bluetooth", "network", "custom/sagevpn", "pulseaudio", "backlight", "battery", "custom/wallpaper", "custom/power"],
+
+  "niri/workspaces": {
+    "format": "{icon}",
+    "format-icons": {
+      "terminal": "1",
+      "browser": "2",
+      "ide": "3",
+      "comm": "4",
+      "file-manager": "5",
+      "1": "1",
+      "2": "2",
+      "3": "3",
+      "4": "4",
+      "5": "5",
+      "6": "6",
+      "7": "7",
+      "8": "8",
+      "9": "9",
+      "spotify": "9",
+      "default": "•"
+    }
+  },
+
+  "niri/window": {
+    "format": "{}",
+    "max-length": 46,
+    "separate-outputs": true
+  },
+
+  "clock": {
+    "format": "{:%a  %d %b   %I:%M %p}",
+    "format-alt": "{:%Y-%m-%d   %I:%M:%S %p}",
+    "tooltip-format": "<big>{:%B %Y}</big>\n<tt>{calendar}</tt>",
+    "calendar": {
+      "mode": "month",
+      "weeks-pos": "right",
+      "on-scroll": 1,
+      "format": {
+        "months": "<span color='#cba6f7'><b>{}</b></span>",
+        "days": "<span color='#cdd6f4'>{}</span>",
+        "weeks": "<span color='#6c7086'>W{}</span>",
+        "weekdays": "<span color='#89b4fa'><b>{}</b></span>",
+        "today": "<span color='#f9e2af'><b><u>{}</u></b></span>"
+      }
+    }
+  },
+
+  "custom/spotify": {
+    "exec": "/home/hassan/.local/bin/waybar-spotify",
+    "return-type": "json",
+    "interval": 2,
+    "format": "{}",
+    "max-length": 42,
+    "on-click": "/home/hassan/.local/bin/waybar-spotify toggle",
+    "on-click-middle": "/home/hassan/.local/bin/waybar-spotify next",
+    "on-click-right": "/home/hassan/.local/bin/waybar-spotify open",
+    "on-scroll-up": "/home/hassan/.local/bin/waybar-spotify next",
+    "on-scroll-down": "/home/hassan/.local/bin/waybar-spotify previous"
+  },
+
+  "custom/spotify-heart": {
+    "exec": "/home/hassan/.local/bin/waybar-spotify heart",
+    "return-type": "json",
+    "interval": 1,
+    "format": "{}",
+    "on-click": "/home/hassan/.local/bin/waybar-spotify like"
+  },
+
+  "custom/lazyssh": {
+    "format": "",
+    "tooltip-format": "LazySSH — SSH servers",
+    "on-click": "niri msg action spawn -- alacritty --class lazyssh --title LazySSH -e /home/hassan/.local/bin/lazyssh"
+  },
+
+  "custom/staging-monitor": {
+    "format": "",
+    "tooltip-format": "Teleflows staging dashboard\nRead-only SSH · localhost only\nClick to open",
+    "on-click": "/home/hassan/ringba/staging-monitor/open-dashboard.sh"
+  },
+
+  "tray": {
+    "icon-size": 16,
+    "spacing": 9
+  },
+
+  "cpu": {
+    "interval": 2,
+    "format": "  {usage}%",
+    "tooltip-format": "CPU usage: {usage}%\nLoad: {load}",
+    "on-click": "niri msg action spawn -- alacritty -e btop"
+  },
+
+  "memory": {
+    "interval": 2,
+    "format": "  {used:0.1f}G / {avail:0.1f}G",
+    "tooltip-format": "RAM used: {used:0.1f} GiB\nRAM available: {avail:0.1f} GiB\nTotal: {total:0.1f} GiB",
+    "on-click": "niri msg action spawn -- alacritty -e btop"
+  },
+
+  "disk": {
+    "path": "/",
+    "interval": 30,
+    "format": "  {used} / {free}",
+    "tooltip-format": "Disk used: {used} ({percentage_used}%)\nDisk available: {free} ({percentage_free}%)\nTotal: {total}"
+  },
+
+  "bluetooth": {
+    "format": "  on",
+    "format-disabled": "󰂲  off",
+    "format-connected": "  {num_connections}",
+    "tooltip-format": "Bluetooth enabled\nClick to open bluetui",
+    "tooltip-format-disabled": "Bluetooth disabled\nClick to open bluetui",
+    "tooltip-format-connected": "{device_enumerate}",
+    "tooltip-format-enumerate-connected": "{device_alias}",
+    "on-click": "niri msg action spawn -- alacritty -e bluetui"
+  },
+
+  "network": {
+    "interface": "wlp0s20f3",
+    "format-wifi": "  {essid}  {signalStrength}%",
+    "format-ethernet": "  wired",
+    "format-linked": "  linked",
+    "format-disconnected": "󰖪  offline",
+    "tooltip-format-wifi": "{essid}\n{ipaddr}/{cidr}\nSignal: {signalStrength}%\nLeft click: Wi-Fi menu\nRight click: nmtui",
+    "tooltip-format-ethernet": "{ifname}\n{ipaddr}/{cidr}\nLeft click: Wi-Fi menu\nRight click: nmtui",
+    "on-click": "/home/hassan/.config/waybar/wifi-menu.sh",
+    "on-click-right": "niri msg action spawn -- alacritty -e /home/hassan/.local/bin/nmtui-live"
+  },
+
+  "custom/sagevpn": {
+    "exec": "/home/hassan/.local/bin/sagevpn status",
+    "interval": 2,
+    "format": "  {}",
+    "tooltip-format": "SageTeck VPN: {}\nClick to connect/disconnect",
+    "on-click": "/home/hassan/.local/bin/sagevpn-rofi"
+  },
+
+  "pulseaudio": {
+    "scroll-step": 5,
+    "max-volume": 200,
+    "format": "{icon}  {volume}%",
+    "format-muted": "🔇  muted",
+    "format-icons": {
+      "default": ["", "", ""]
+    },
+    "on-click": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle",
+    "on-click-right": "niri msg action spawn -- flatpak run com.github.wwmm.easyeffects"
+  },
+
+  "backlight": {
+    "device": "intel_backlight",
+    "format": "  {percent}%",
+    "scroll-step": 5
+  },
+
+  "battery": {
+    "bat": "BAT0",
+    "interval": 10,
+    "states": {
+      "warning": 30,
+      "critical": 15
+    },
+    "format": "{icon}  {capacity}%",
+    "format-charging": "  {capacity}%",
+    "format-plugged": "  {capacity}%",
+    "format-full": "  full",
+    "format-alt": "{time}  {icon}",
+    "format-icons": ["", "", "", "", ""]
+  },
+
+  "custom/wallpaper": {
+    "format": "",
+    "tooltip-format": "Choose wallpaper",
+    "on-click": "/home/hassan/.local/bin/select-wallpaper"
+  },
+
+  "custom/power": {
+    "format": "",
+    "tooltip-format": "Power menu",
+    "on-click": "/home/hassan/.config/waybar/power-menu.sh"
+  }
+}

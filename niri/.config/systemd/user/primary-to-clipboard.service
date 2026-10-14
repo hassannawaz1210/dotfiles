@@ -1,0 +1,13 @@
+[Unit]
+Description=Copy selected text to the regular clipboard
+PartOf=graphical-session.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/wl-paste --primary --type text --watch /home/hassan/.local/bin/primary-to-clipboard
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=graphical-session.target

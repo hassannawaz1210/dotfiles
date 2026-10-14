@@ -1,0 +1,38 @@
+#!/bin/sh
+
+geometry="$(slurp)" || exit 0
+output_dir="/home/hassan/Pictures/Screenshots"
+output_file="$output_dir/Screenshot from $(date '+%Y-%m-%d %H-%M-%S').png"
+
+mkdir -p "$output_dir"
+
+# Open the editor on the output containing the selected region.
+selection_x="${geometry%%,*}"
+selection_y_and_size="${geometry#*,}"
+selection_y="${selection_y_and_size%% *}"
+output_name="$(
+    niri msg --json outputs 2>/dev/null |
+        jq -r --argjson x "$selection_x" --argjson y "$selection_y" '
+            to_entries[]
+            | select(
+                $x >= .value.logical.x
+                and $x < (.value.logical.x + .value.logical.width)
+                and $y >= .value.logical.y
+                and $y < (.value.logical.y + .value.logical.height)
+            )
+            | .key
+        ' |
+        head -n 1
+)"
+
+if [ -n "$output_name" ]; then
+    niri msg action focus-monitor "$output_name" >/dev/null 2>&1 || true
+fi
+
+grim -g "$geometry" - |
+    /home/hassan/.local/bin/swappy -f - -o "$output_file" || exit 1
+
+if [ -s "$output_file" ]; then
+    wl-copy --type image/png < "$output_file"
+    notify-send "Screenshot captured" "Saved and copied to clipboard" 2>/dev/null || true
+fi

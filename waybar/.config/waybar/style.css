@@ -1,0 +1,85 @@
+/* Dark rounded theme. Module configuration and layout are unchanged. */
+@define-color base #101212;
+@define-color surface #282d2f;
+@define-color overlay #596266;
+@define-color text #c7cbcc;
+@define-color muted #a3abad;
+@define-color blue #a4b8c0;
+@define-color green #a3b7a6;
+@define-color yellow #c8b991;
+@define-color red #c79595;
+
+* {
+  border: none;
+  border-radius: 0;
+  min-height: 0;
+  font-family: "Noto Sans", "FontAwesome", sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+}
+window#waybar {
+  background: rgba(16, 18, 18, 0.98);
+  color: @text;
+  border: 1px solid #343b3e;
+  border-radius: 16px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+}
+.modules-left, .modules-center, .modules-right {
+  background: transparent;
+  border: none;
+  border-radius: 10px;
+}
+tooltip {
+  background: #171a1b;
+  border: 1px solid #414a4e;
+  border-radius: 9px;
+}
+tooltip label { color: @text; padding: 7px; }
+#workspaces { padding: 3px 4px; }
+#workspaces button {
+  color: @muted;
+  background: transparent;
+  border-radius: 16px;
+  padding: 0 10px;
+  margin: 0 2px;
+  box-shadow: none;
+  transition: all 150ms ease;
+}
+#workspaces button:hover { background: @surface; color: @text; }
+#workspaces button.active {
+  border-radius: 16px;
+  background: #a4b8c0;
+  color: #14191b;
+  padding: 0 10px;
+}
+#workspaces button.urgent { background: @red; color: #14191b; }
+#window { color: @muted; padding: 0 10px 0 6px; }
+#window.empty { padding: 0; }
+#custom-spotify { color: @green; padding: 0 1px 0 11px; border-radius: 5px; }
+#custom-spotify.paused, #custom-spotify.stopped { color: @overlay; }
+#custom-spotify-heart { color: @red; padding: 0 3px 0 1px; border-radius: 5px; }
+#custom-spotify-heart.unliked { color: @muted; }
+#custom-spotify-heart.unavailable { color: @overlay; }
+#clock { color: @text; padding: 0 11px; }
+#tray, #custom-lazyssh, #custom-staging-monitor, #cpu, #memory, #disk,
+#bluetooth, #network, #custom-sagevpn, #pulseaudio, #backlight, #battery,
+#custom-wallpaper, #custom-power {
+  color: @text;
+  padding: 0 7px;
+  margin: 3px 0;
+  border-left: 1px solid @overlay;
+  border-radius: 5px;
+}
+#tray { border-left: none; padding-left: 8px; }
+#custom-lazyssh, #custom-staging-monitor, #custom-wallpaper, #custom-power { font-size: 13px; }
+#custom-power { padding-right: 10px; }
+#bluetooth.disabled, #pulseaudio.muted { color: @overlay; }
+#network.disconnected, #battery.critical:not(.charging) { color: @red; }
+#battery.warning:not(.charging) { color: @yellow; }
+#battery.charging, #battery.plugged, #custom-sagevpn { color: @green; }
+#custom-spotify:hover, #custom-spotify-heart:hover, #custom-lazyssh:hover,
+#custom-staging-monitor:hover, #network:hover, #cpu:hover, #memory:hover,
+#disk:hover, #bluetooth:hover, #custom-sagevpn:hover, #pulseaudio:hover,
+#backlight:hover, #battery:hover, #custom-wallpaper:hover, #custom-power:hover {
+  background: @surface;
+}

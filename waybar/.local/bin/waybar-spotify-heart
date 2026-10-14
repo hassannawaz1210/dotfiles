@@ -1,0 +1,129 @@
+#!/usr/bin/python3
+"""Read the current Spotify save control over AT-SPI, without focusing it.
+
+Cache only accessibility object locations, never the song's liked state.
+"""
+import json
+import os
+from pathlib import Path
+import signal
+
+import dbus
+
+ACCESSIBLE = "org.a11y.atspi.Accessible"
+PROPERTIES = "org.freedesktop.DBus.Properties"
+ROOT = "/org/a11y/atspi/accessible/root"
+CACHE = Path(os.environ.get("XDG_RUNTIME_DIR", "/tmp")) / f"waybar-spotify-heart-{os.getuid()}.json"
+
+
+def timeout_handler(*_):
+    raise TimeoutError("Spotify accessibility timed out")
+
+
+def output(liked=None, tooltip="Spotify liked state unavailable"):
+    print(json.dumps({
+        "text": "\uf004" if liked else "\uf08a",
+        "class": "liked" if liked else "unliked" if liked is False else "unavailable",
+        "tooltip": tooltip,
+    }))
+
+
+def main():
+    session = dbus.SessionBus()
+    player = session.get_object("org.mpris.MediaPlayer2.spotify", "/org/mpris/MediaPlayer2")
+
+    def metadata():
+        return player.Get("org.mpris.MediaPlayer2.Player", "Metadata", dbus_interface=PROPERTIES, timeout=1)
+
+    track = metadata()
+    if not ("/track/" in str(track.get("xesam:url", "")) or str(track.get("xesam:url", "")).startswith("spotify:track:")):
+        output(tooltip="Play a Spotify song to toggle Liked Songs")
+        return
+    title = str(track.get("xesam:title", ""))
+    artists = [str(a) for a in track.get("xesam:artist", [])]
+    address = session.get_object("org.a11y.Bus", "/org/a11y/bus").GetAddress(dbus_interface="org.a11y.Bus", timeout=1)
+    bus = dbus.bus.BusConnection(address)
+
+    def props(ref):
+        return bus.get_object(*ref).GetAll(ACCESSIBLE, dbus_interface=PROPERTIES, timeout=0.5)
+
+    def children(ref):
+        return bus.get_object(*ref).GetChildren(dbus_interface=ACCESSIBLE, timeout=0.5)
+
+    def find(start, predicate, limit=600):
+        queue = [start]
+        for ref in queue:
+            if limit <= 0:
+                break
+            limit -= 1
+            try:
+                properties = props(ref)
+                if predicate(properties):
+                    return tuple(ref)
+                queue.extend(children(ref))
+            except dbus.DBusException:
+                continue
+        raise LookupError("Spotify control not found")
+
+    def is_frame(properties):
+        name = str(properties.get("Name", ""))
+        return bool(title and title in name and any(a in name for a in artists))
+
+    def is_bar(properties):
+        return properties.get("Name") == "Now playing bar"
+
+    try:
+        cached = json.loads(CACHE.read_text())
+        frame, bar = cached["frame"], cached["bar"]
+        if not is_frame(props(frame)) or not is_bar(props(bar)):
+            raise LookupError("Old Spotify control")
+    except (OSError, ValueError, KeyError, LookupError, dbus.DBusException):
+        apps = children(("org.a11y.atspi.Registry", ROOT))
+        frame = None
+        for app in apps:
+            try:
+                if str(props(app).get("Name", "")).lower() not in ("chromium", "spotify"):
+                    continue
+                for candidate in children(app):
+                    if is_frame(props(candidate)):
+                        frame = tuple(candidate)
+                        break
+                if frame:
+                    break
+            except dbus.DBusException:
+                continue
+        if frame is None:
+            raise LookupError("Spotify accessibility not available")
+        bar = find(frame, is_bar)
+        temp = CACHE.with_suffix(f".{os.getpid()}.tmp")
+        temp.write_text(json.dumps({"frame": frame, "bar": bar}))
+        temp.replace(CACHE)
+
+    # Scope to the current song region, never playlist rows or album controls.
+    region = find(bar, lambda p: str(p.get("Name", "")).startswith(f"Now playing: {title} by "), limit=70)
+    button = find(region, lambda p: p.get("Attributes", {}).get("tag") == "button" and p.get("Name") in (
+        "Add to Liked Songs", "Remove from Liked Songs", "Add to playlist",
+    ), limit=60)
+    p = props(button)
+    name = str(p["Name"])
+    if name == "Add to Liked Songs":
+        liked = False
+    elif name == "Remove from Liked Songs":
+        liked = True
+    elif "encore-internal-color-text-bright-accent" in str(p.get("Attributes", {}).get("class", "")):
+        # This Spotify build labels its saved current-song control this way.
+        liked = True
+    else:
+        raise LookupError("Unrecognized Spotify save state")
+    if metadata().get("mpris:trackid") != track.get("mpris:trackid"):
+        raise LookupError("Song changed while checking")
+    output(liked, ("Remove from" if liked else "Add to") + f" Liked Songs: {title}")
+
+
+if __name__ == "__main__":
+    signal.signal(signal.SIGALRM, timeout_handler)
+    signal.alarm(4)
+    try:
+        main()
+    except (dbus.DBusException, OSError, LookupError, ValueError, TimeoutError):
+        output()

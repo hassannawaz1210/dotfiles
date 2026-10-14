@@ -1,0 +1,75 @@
+#!/usr/bin/python3
+"""Toggle a fresh clipboard window; never reuse an invisible GTK instance."""
+import fcntl
+import json
+import os
+from pathlib import Path
+import subprocess
+import time
+
+APP = 'org.d7om.ClipseGUI'
+
+
+def run(args):
+    return subprocess.run(args, check=True, capture_output=True, text=True, timeout=3)
+
+
+def windows():
+    return [w for w in json.loads(run(['niri', 'msg', '--json', 'windows']).stdout)
+            if w.get('app_id') in {APP, 'clipse-gui'}]
+
+
+def action(name, window):
+    run(['niri', 'msg', 'action', name, '--id', str(window['id'])])
+
+
+def main():
+    runtime = Path(os.environ['XDG_RUNTIME_DIR'])
+    with (runtime / 'clipse-toggle.lock').open('a+') as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return
+        lock.seek(0)
+        previous = lock.read().strip()
+        if previous and time.monotonic() - float(previous) < 0.4:
+            return
+        lock.seek(0)
+        lock.truncate()
+        lock.write(str(time.monotonic()))
+        lock.flush()
+
+        current = windows()
+        if current:
+            window = current[0]
+            action('close-window' if window.get('is_focused') else 'focus-window', window)
+            return
+
+        # Each closed window exits, so stale GTK visibility and delayed hide
+        # callbacks cannot leak into the next invocation. Keep diagnostics.
+        state = Path.home() / '.local/state/clipse-gui'
+        state.mkdir(parents=True, exist_ok=True)
+        log = state / 'launch.log'
+        if log.exists() and log.stat().st_size > 1_000_000:
+            log.replace(state / 'launch.log.1')
+        with log.open('a') as output:
+            process = subprocess.Popen(['/home/hassan/.local/bin/clipse-gui'],
+                stdin=subprocess.DEVNULL, stdout=output, stderr=output,
+                start_new_session=True)
+        for _ in range(80):
+            current = windows()
+            if current:
+                action('focus-window', current[0])
+                return
+            if process.poll() is not None and process.returncode != 0:
+                break
+            time.sleep(0.05)
+        raise RuntimeError('Clipboard window did not open; see ~/.local/state/clipse-gui/launch.log')
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except Exception as error:
+        subprocess.run(['notify-send', 'Clipboard history', str(error)], timeout=3)
+        raise

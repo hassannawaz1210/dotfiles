@@ -1,0 +1,35 @@
+#!/usr/bin/python3
+"""Mirror nonempty selections without erasing an existing explicit copy."""
+import os
+import signal
+import subprocess
+import sys
+
+if os.environ.get("CLIPBOARD_STATE", "data") in {"nil", "clear"}:
+    sys.exit(0)
+
+# A stalled source must not block all subsequent selection events.
+def transfer_timeout(signum, frame):
+    raise TimeoutError("Selection source did not finish sending data")
+
+signal.signal(signal.SIGALRM, transfer_timeout)
+signal.alarm(5)
+try:
+    data = sys.stdin.buffer.read()
+except TimeoutError as error:
+    print(error, file=sys.stderr)
+    sys.exit(1)
+finally:
+    signal.alarm(0)
+
+# Some apps advertise an empty data offer instead of clearing the selection.
+if data:
+    try:
+        subprocess.run(
+            ["/usr/bin/wl-copy", "--type", "text/plain;charset=utf-8"],
+            input=data, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            timeout=3, check=True,
+        )
+    except (subprocess.TimeoutExpired, subprocess.CalledProcessError) as error:
+        print(f"Selection copy failed: {type(error).__name__}", file=sys.stderr)
+        sys.exit(1)

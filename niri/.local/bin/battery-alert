@@ -1,0 +1,47 @@
+#!/bin/sh
+
+battery=/sys/class/power_supply/BAT0
+[ -r "$battery/capacity" ] && [ -r "$battery/status" ] || exit 0
+
+last_alert=
+while :; do
+    capacity=$(cat "$battery/capacity")
+    status=$(cat "$battery/status")
+
+    alert=
+    if [ "$capacity" -ge 100 ] && [ "$status" != Discharging ]; then
+        alert=full
+        title="Battery fully charged"
+        urgency=normal
+        icon=battery-full
+        sound=complete
+        sound_file=/usr/share/sounds/Yaru/stereo/complete.oga
+    elif [ "$status" = Discharging ]; then
+        if [ "$capacity" -le 5 ]; then
+            alert=critical
+            title="Battery critically low"
+        elif [ "$capacity" -le 15 ]; then
+            alert=low
+            title="Battery low"
+        fi
+        urgency=critical
+        icon=battery-low
+        sound=battery-low
+        sound_file=/usr/share/sounds/Yaru/stereo/battery-low.oga
+    fi
+
+    if [ -n "$alert" ] && [ "$alert" != "$last_alert" ]; then
+        if [ "$alert" = full ]; then
+            notify-send -u "$urgency" -a Battery -i "$icon" \
+                -h string:bgcolor:#a6e3a1 -h string:fgcolor:#11111b \
+                "$title" "$capacity%"
+        else
+            notify-send -u "$urgency" -a Battery -i "$icon" "$title" "$capacity%"
+        fi
+        canberra-gtk-play -i "$sound" -d "$title" >/dev/null 2>&1 ||
+            pw-play "$sound_file" >/dev/null 2>&1
+    fi
+
+    last_alert=$alert
+    sleep 30
+done

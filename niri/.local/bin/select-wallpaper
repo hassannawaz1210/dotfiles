@@ -1,0 +1,169 @@
+#!/usr/bin/env python3
+
+import os
+import signal
+import subprocess
+import sys
+from pathlib import Path
+
+import gi
+
+gi.require_version("Gtk", "4.0")
+gi.require_version("GdkPixbuf", "2.0")
+from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk
+
+
+WALLPAPER_DIR = Path("/home/hassan/wallpapers")
+CURRENT_WALLPAPER = Path("/home/hassan/.config/current-wallpaper")
+IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
+START_HIDDEN = "--background" in sys.argv
+if START_HIDDEN:
+    sys.argv.remove("--background")
+
+
+class WallpaperPicker(Gtk.Application):
+    def __init__(self):
+        super().__init__(application_id="local.hassan.WallpaperPicker")
+        self.selected_button = None
+
+    def do_activate(self):
+        windows = self.get_windows()
+        if windows:
+            windows[0].present()
+            return
+
+        window = Gtk.ApplicationWindow(application=self)
+        window.connect("close-request", self.hide_window)
+        window.set_decorated(False)
+        window.set_default_size(920, 620)
+
+        flow = Gtk.FlowBox()
+        flow.set_selection_mode(Gtk.SelectionMode.NONE)
+        flow.set_homogeneous(True)
+        flow.set_min_children_per_line(2)
+        flow.set_max_children_per_line(4)
+        flow.set_row_spacing(12)
+        flow.set_column_spacing(12)
+        flow.set_margin_start(16)
+        flow.set_margin_end(16)
+        flow.set_margin_bottom(16)
+
+        scroller = Gtk.ScrolledWindow()
+        scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scroller.set_child(flow)
+        scroller.set_vexpand(True)
+
+        content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        content.append(scroller)
+        window.set_child(content)
+
+        css = Gtk.CssProvider()
+        css.load_from_data("""
+            window { background: #11111b; }
+            .wallpaper-card {
+                background: #1e1e2e;
+                color: #cdd6f4;
+                border: 2px solid transparent;
+                border-radius: 10px;
+                padding: 5px;
+            }
+            .wallpaper-card:hover {
+                background: #313244;
+                border-color: #89b4fa;
+            }
+            .wallpaper-card.selected { border-color: #a6e3a1; }
+        """)
+        Gtk.StyleContext.add_provider_for_display(
+            Gdk.Display.get_default(),
+            css,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+        )
+
+        if not START_HIDDEN:
+            window.present()
+        # ponytail: gallery stays in memory; restart after changing ~/wallpapers.
+        GLib.idle_add(
+            self.load_previews, flow, window, priority=GLib.PRIORITY_LOW
+        )
+
+    def load_previews(self, flow, window):
+        current = CURRENT_WALLPAPER.resolve() if CURRENT_WALLPAPER.exists() else None
+        images = sorted(
+            path for path in WALLPAPER_DIR.iterdir()
+            if path.is_file() and path.suffix.lower() in IMAGE_SUFFIXES
+        )
+
+        for image in images:
+            button = Gtk.Button()
+            button.add_css_class("wallpaper-card")
+            button.connect("clicked", self.set_wallpaper, image, window)
+
+            picture = Gtk.Picture()
+            picture.set_content_fit(Gtk.ContentFit.COVER)
+            picture.set_size_request(220, 130)
+
+            try:
+                stream = Gio.File.new_for_path(str(image)).read(None)
+            except Exception:
+                continue
+            GdkPixbuf.Pixbuf.new_from_stream_at_scale_async(
+                stream, 260, 150, False, None,
+                self.finish_preview, (picture, button, stream),
+            )
+
+            if image.resolve() == current:
+                button.add_css_class("selected")
+                self.selected_button = button
+
+            card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+            card.append(picture)
+            button.set_child(card)
+            flow.append(button)
+
+        if not images:
+            flow.append(Gtk.Label(label="No wallpapers found in ~/wallpapers"))
+
+        return GLib.SOURCE_REMOVE
+
+    def finish_preview(self, _source, result, preview):
+        picture, button, stream = preview
+        try:
+            pixbuf = GdkPixbuf.Pixbuf.new_from_stream_finish(result)
+            picture.set_paintable(Gdk.Texture.new_for_pixbuf(pixbuf))
+        except Exception:
+            button.set_visible(False)
+        finally:
+            stream.close(None)
+
+    def hide_window(self, window):
+        window.set_visible(False)
+        return True
+
+    def set_wallpaper(self, _button, wallpaper, window):
+        temporary_link = CURRENT_WALLPAPER.with_name(".current-wallpaper.tmp")
+        temporary_link.unlink(missing_ok=True)
+        temporary_link.symlink_to(wallpaper)
+        os.replace(temporary_link, CURRENT_WALLPAPER)
+
+        subprocess.run(
+            ["pkill", "-x", "swaybg"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+        subprocess.Popen(
+            ["swaybg", "-i", str(CURRENT_WALLPAPER), "-m", "fill"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+        if self.selected_button is not None:
+            self.selected_button.remove_css_class("selected")
+        _button.add_css_class("selected")
+        self.selected_button = _button
+        window.set_visible(False)
+
+
+if __name__ == "__main__":
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
+    raise SystemExit(WallpaperPicker().run())

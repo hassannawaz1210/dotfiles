@@ -1,0 +1,278 @@
+#!/usr/bin/python3
+"""A small, click-through Ayaka companion above the existing Waybar edge."""
+import ctypes
+import math
+import os
+from pathlib import Path
+import signal
+import time
+
+# Load before GTK connects to Wayland, so layer-shell can wrap its surfaces.
+layer = ctypes.CDLL('libgtk-layer-shell.so.0', mode=ctypes.RTLD_GLOBAL)
+import gi
+gi.__path__.append(str(Path.home() / '.local/share/waybar-waifu/vendor/usr/lib/python3/dist-packages/gi'))
+gi.require_foreign('cairo')
+gi.require_version('Gtk', '3.0')
+gi.require_version('Gdk', '3.0')
+from gi.repository import Gtk, Gdk, GdkPixbuf, GLib
+import cairo
+
+get_pointer = ctypes.pythonapi.PyCapsule_GetPointer
+get_pointer.restype = ctypes.c_void_p
+get_pointer.argtypes = [ctypes.py_object, ctypes.c_char_p]
+def ptr(obj):
+    return get_pointer(obj.__gpointer__, None)
+
+def bind(name, *args):
+    fn = getattr(layer, 'gtk_layer_' + name)
+    fn.argtypes = [ctypes.c_void_p, *args]
+    fn.restype = None
+    return fn
+init = bind('init_for_window')
+namespace = bind('set_namespace', ctypes.c_char_p)
+set_layer = bind('set_layer', ctypes.c_int)
+anchor = bind('set_anchor', ctypes.c_int, ctypes.c_int)
+margin = bind('set_margin', ctypes.c_int, ctypes.c_int)
+exclusive = bind('set_exclusive_zone', ctypes.c_int)
+keyboard = bind('set_keyboard_mode', ctypes.c_int)
+monitor_set = bind('set_monitor', ctypes.c_void_p)
+
+SIZE = 48
+HEIGHT = 102
+FLOOR = 70  # Bar top within the overlay; the final 32px cover the bar.
+BAR_TOP = 36  # Existing 32px Waybar + 4px bottom margin; no layout reservation.
+SPRITES = Path.home() / '.local/share/waybar-waifu/sprites'
+frames = {i: GdkPixbuf.Pixbuf.new_from_file_at_scale(str(SPRITES / f'shime{i}.png'), SIZE, SIZE, True)
+          for i in (1, 2, 3, 9, 11, 13, 14, 19, 20, 21, 26, 31, 32, 33)}
+HIDDEN = Path(os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache"))) / "waybar-waifu-hidden"
+
+class Companion(Gtk.Window):
+    def __init__(self, monitor):
+        super().__init__(type=Gtk.WindowType.TOPLEVEL)
+        self.set_title('Waybar Ayaka')
+        self.set_decorated(False)
+        self.set_app_paintable(True)
+        self.set_accept_focus(False)
+        self.set_visual(self.get_screen().get_rgba_visual())
+        self.set_size_request(1, HEIGHT)
+        p = ptr(self)
+        init(p)
+        namespace(p, b'waybar-waifu')
+        monitor_set(p, ptr(monitor))
+        set_layer(p, 2)  # TOP, not above lock screens.
+        for edge in (0, 1, 3):
+            anchor(p, edge, True)
+        exclusive(p, -1)  # Ignore existing reserved zones; reserve nothing ourselves.
+        keyboard(p, 0)
+        margin(p, 3, 4)
+        self.connect('draw', self.draw)
+        self.connect('realize', self.click_through)
+        self.connect('map-event', self.click_through)
+        self.started = time.monotonic() - 92
+        self.paused_at = None
+        self.old_x = 0
+        if not HIDDEN.exists():
+            self.show_all()
+        self.timer = GLib.timeout_add(50, self.tick)
+        self.connect('destroy', self.cleanup)
+
+    def click_through(self, *_):
+        if self.get_window():
+            self.get_window().input_shape_combine_region(cairo.Region(), 0, 0)
+        return False
+
+    def cleanup(self, *_):
+        GLib.source_remove(self.timer)
+
+    def elapsed(self):
+        now = self.paused_at if self.paused_at is not None else time.monotonic()
+        return now - self.started
+
+    def cycle_duration(self):
+        travel = max(15, (self.get_allocated_width() - SIZE - 24) / 42)
+        return 86 + travel + 6
+
+    def pose(self):
+        # Each activity emerges from the bar and ducks away before the next.
+        width = self.get_allocated_width()
+        elapsed = self.elapsed()
+        t = elapsed % self.cycle_duration()
+        reverse = int(elapsed / self.cycle_duration()) % 2 == 1
+        base_x = max(8, min(width - SIZE - 160, width * 0.2))
+        x, y, frame = base_x, FLOOR - SIZE, 1
+        if t < 16:
+            # Peek, raise a hand in a little wave, and duck back down.
+            reveal = min(1, t / 2, max(0, (13 - t) / 2))
+            # Peek first, then rise fully to wave with her body above the bar.
+            lift = 28 if t < 3 else 28 + 20 * min(1, (t - 3) / 1.2)
+            y = FLOOR - lift * reveal + math.sin(t * 2) * reveal
+            frame = 26 if t < 3 or t > 10 else (13, 14)[int(t * 3) % 2]
+        elif t < 38:
+            rest = t - 16
+            reveal = min(1, rest / 2, max(0, (20 - rest) / 2))
+            y = FLOOR - 34 * reveal
+            frame = 9
+        elif t < 62:
+            walk = t - 38
+            reveal = min(1, walk / 2, max(0, (22 - walk) / 2))
+            y = FLOOR - SIZE * reveal
+            if walk < 9:
+                x += 140 * max(0, min(1, (walk - 2) / 7))
+                frame = (1, 2, 1, 3)[int(walk * 5) % 4] if walk >= 2 else 1
+            elif walk < 13:
+                x += 140
+                frame = 26 if int(walk) % 2 else 1
+            else:
+                x += 140
+                frame = (31, 32, 31, 33)[int(walk * 2) % 4]
+        elif t < 86:
+            sitting = t - 62
+            x = width * 0.5 - SIZE / 2
+            if sitting < 1.8:
+                u = sitting / 1.8
+                y = FLOOR - 24 * (u * u * (3 - 2 * u))
+                frame = 26
+            elif sitting < 4.5:
+                u = (sitting - 1.8) / 2.7
+                y = FLOOR - 24 - 24 * (u * u * (3 - 2 * u))
+                frame = (13, 14)[int(sitting * 3) % 2]
+            elif sitting < 5.5:
+                u = sitting - 4.5
+                y = FLOOR - SIZE + 6 * (u * u * (3 - 2 * u))
+                frame = 31
+            elif sitting < 22:
+                y = FLOOR - SIZE + 6
+                frame = (31, 32, 31, 33)[int((sitting - 5.5) * 2.5) % 4] if sitting < 21 else 31
+            else:
+                u = (sitting - 22) / 2
+                y = FLOOR - (SIZE - 6) * (1 - u * u * (3 - 2 * u))
+                frame = (13, 14)[int(sitting * 3) % 2]
+        else:
+            crawl = t - 86
+            travel = self.cycle_duration() - 92
+            reveal = min(1, crawl / 3, max(0, (travel + 6 - crawl) / 3))
+            y = FLOOR - SIZE * reveal
+            progress = max(0, min(1, (crawl - 3) / travel))
+            x = 8 + (width - SIZE - 16) * progress
+            frame = (20, 20, 21, 21)[int(crawl * 5) % 4]
+        if reverse:
+            x = width - SIZE - x
+        return x, y, frame, False if 62 <= t < 86 else not reverse
+
+    def draw(self, widget, cr):
+        cr.set_operator(cairo.OPERATOR_SOURCE)
+        cr.set_source_rgba(0, 0, 0, 0)
+        cr.paint()
+        cr.set_operator(cairo.OPERATOR_OVER)
+        x, y, frame, flip = self.pose()
+        # Keep life visible even when two source poses differ only by a few pixels.
+        motion_t = self.elapsed()
+        if frame in (20, 21):
+            y -= 1.4 * (1 + math.sin(motion_t * 9))
+        elif frame in (31, 32, 33):
+            y += 0.8 * math.sin(motion_t * 5)
+        cr.save()
+        if frame not in (31, 32, 33):
+            # Keep normal activities above the bar; seated feet may hang over it.
+            cr.rectangle(0, 0, self.get_allocated_width(), FLOOR)
+            cr.clip()
+        cr.translate(x + (SIZE if flip else 0), y)
+        if flip:
+            cr.scale(-1, 1)
+        t = self.elapsed() % self.cycle_duration()
+        if frame == 9:
+            # Recline on her back, face visible, using the closed-eye pose.
+            cr.translate(SIZE / 2, SIZE / 2)
+            cr.rotate(math.radians(65))
+            cr.translate(-SIZE / 2, -SIZE / 2)
+        if 18 < t < 34:
+            # Stretch very slightly around her resting baseline for breathing.
+            breathing = 1 + 0.025 * math.sin((t - 18) * math.pi / 2)
+            cr.translate(0, SIZE * (1 - breathing))
+            cr.scale(1, breathing)
+        Gdk.cairo_set_source_pixbuf(cr, frames[frame], 0, 0)
+        cr.paint()
+        cr.restore()
+        if 18 < t < 34:
+            # Three little letters drift upward and fade independently.
+            cr.select_font_face('Sans', cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
+            for i in range(3):
+                drift = ((t - 18) * 0.35 + i / 3) % 1
+                cr.set_source_rgba(0.72, 0.79, 0.82, math.sin(drift * math.pi) * 0.85)
+                cr.set_font_size(8 + 3 * drift)
+                cr.move_to(x + SIZE - 4 + 14 * drift, y + 12 - 27 * drift)
+                cr.show_text('z' if i < 2 else 'Z')
+        elif 3 < t < 10:
+            cr.set_source_rgba(0.78, 0.84, 0.86, 0.65)
+            cr.set_line_width(1)
+            # Small motion strokes beside the waving hand.
+            hand_x = x + (SIZE - 5 if flip else 5)
+            for i in range(2):
+                cr.arc(hand_x, y + 19, 5 + i * 4, -0.8, 0.4)
+                cr.stroke()
+        return True
+
+    def tick(self):
+        if HIDDEN.exists():
+            self.hide()
+            return True
+        if not self.get_visible():
+            self.show_all()
+            self.click_through()
+        # Invalidate the entire thin overlay, including transformed sprite bounds.
+        # This avoids stale frames after clipping, scaling, or a monitor remap.
+        self.queue_draw()
+        return True
+
+    def select_activity(self, offset):
+        self.paused_at = None
+        self.started = time.monotonic() - offset
+        self.tick()
+
+    def toggle(self):
+        if self.paused_at is None:
+            self.paused_at = time.monotonic()
+        else:
+            self.started += time.monotonic() - self.paused_at
+            self.paused_at = None
+
+def toggle_visibility():
+    if HIDDEN.exists():
+        HIDDEN.unlink()
+    else:
+        HIDDEN.parent.mkdir(parents=True, exist_ok=True)
+        HIDDEN.touch()
+    for window in windows.values():
+        window.tick()
+    return True
+
+def select_activity():
+    request = Path(os.environ.get('XDG_RUNTIME_DIR', '/run/user/1000')) / 'waybar-waifu-activity'
+    try:
+        name = request.read_text().strip()
+        request.unlink()
+        offset = {'sleep': 20, 'crawl': 92, 'sit': 62}[name]
+    except (OSError, KeyError):
+        return True
+    for window in windows.values():
+        window.select_activity(offset)
+    return True
+
+windows = {}
+display = Gdk.Display.get_default()
+def sync_monitors(*_):
+    current = {display.get_monitor(i) for i in range(display.get_n_monitors())}
+    for mon in list(windows):
+        if mon not in current:
+            windows.pop(mon).destroy()
+    for mon in current:
+        if mon not in windows:
+            windows[mon] = Companion(mon)
+sync_monitors()
+display.connect('monitor-added', sync_monitors)
+display.connect('monitor-removed', sync_monitors)
+GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGTERM, lambda: (Gtk.main_quit(), False)[1])
+GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGUSR1, lambda: ([w.toggle() for w in windows.values()], True)[1])
+GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGUSR2, toggle_visibility)
+GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGHUP, select_activity)
+Gtk.main()

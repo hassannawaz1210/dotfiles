@@ -1,0 +1,30 @@
+#!/bin/sh
+
+focused_window=$(niri msg --json windows | jq -c '.[] | select(.is_focused)') || exit 1
+[ "$(printf '%s' "$focused_window" | jq -r '.app_id')" = "Alacritty" ] || {
+    notify-send "Rename terminal" "The focused window is not Alacritty"
+    exit 0
+}
+
+alacritty_pid=$(printf '%s' "$focused_window" | jq -r '.pid')
+shell_pid=$(pgrep -P "$alacritty_pid" | head -n 1)
+[ -n "$shell_pid" ] || exit 1
+
+alacritty_window_id=$(
+    tr '\0' '\n' < "/proc/$shell_pid/environ" |
+        sed -n 's/^ALACRITTY_WINDOW_ID=//p'
+)
+alacritty_socket=$(
+    tr '\0' '\n' < "/proc/$shell_pid/environ" |
+        sed -n 's/^ALACRITTY_SOCKET=//p'
+)
+[ -n "$alacritty_window_id" ] && [ -n "$alacritty_socket" ] || exit 1
+
+title=$(printf '' | fuzzel --dmenu --lines=0 --prompt='Terminal title > ') || exit 0
+[ -n "$title" ] || exit 0
+
+quoted_title=$(printf '%s' "$title" | jq -Rs '.') || exit 1
+ALACRITTY_SOCKET=$alacritty_socket exec alacritty msg config \
+    --window-id "$alacritty_window_id" \
+    "window.title=$quoted_title" \
+    'window.dynamic_title=false'

@@ -1,0 +1,10 @@
+#!/bin/sh
+set -eu
+case "${1:-toggle}" in
+  toggle) signal=SIGUSR2 ;;
+  sleep|crawl|sit)
+    printf '%s\n' "$1" > "${XDG_RUNTIME_DIR:-/run/user/1000}/waybar-waifu-activity"
+    signal=SIGHUP ;;
+  *) echo "Usage: waybar-waifu-control [toggle|sleep|crawl|sit]" >&2; exit 2 ;;
+esac
+systemctl --user kill --kill-whom=main --signal="$signal" waybar-waifu.service

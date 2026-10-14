@@ -1,0 +1,21 @@
+#!/bin/sh
+
+# Keep repeated power-button presses from opening multiple dialogs.
+exec 9>"${XDG_RUNTIME_DIR:?}/confirm-hibernate.lock"
+flock -n 9 || exit 0
+
+zenity --question \
+    --title="Hibernate?" \
+    --text="Hibernate the PC now?" \
+    --ok-label="Hibernate" \
+    --cancel-label="Cancel" \
+    --default-cancel || exit 0
+
+if ! error=$(systemctl hibernate 2>&1); then
+    zenity --error \
+        --title="Hibernation failed" \
+        --no-markup \
+        --text="Could not hibernate the PC.
+
+$error"
+fi

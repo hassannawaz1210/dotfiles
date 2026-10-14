@@ -1,0 +1,3 @@
+Ayaka sprite images from https://github.com/ngoc-thu/shimeji/tree/main/characters/Ayaka
+Downloaded 2026-10-13. Original images unchanged.
+See LICENSE.upstream and README.upstream.md for upstream credits.

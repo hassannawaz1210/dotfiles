@@ -1,0 +1,10 @@
+#!/bin/sh
+
+choice=$(
+    printf '%s\n' 'Cancel' 'Clear all clipboard history' |
+        fuzzel --dmenu --prompt='Clear clipboard history? '
+)
+
+[ "$choice" = 'Clear all clipboard history' ] || exit 0
+
+exec /home/hassan/.local/bin/clipse -clear-all

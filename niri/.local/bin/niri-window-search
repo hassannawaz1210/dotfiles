@@ -1,0 +1,22 @@
+#!/bin/sh
+
+selection=$(
+    niri msg --json windows |
+        jq -r '.[] | "\(.id)\t\((.app_id // "unknown") | gsub("[\\t\\r\\n]"; " ")) — \((.title // "Untitled") | gsub("[\\t\\r\\n]"; " "))"' |
+        fuzzel --config=/home/hassan/.config/fuzzel/window-search.ini \
+            --dmenu --prompt='Window > ' \
+            --width=70 --lines=12
+)
+action=$?
+
+[ "$action" -eq 0 ] || [ "$action" -eq 10 ] || exit 0
+
+window_id=${selection%%	*}
+window_id=$(printf '%s\n' "$selection" | cut -f1)
+[ -n "$window_id" ] || exit 0
+
+if [ "$action" -eq 10 ]; then
+    exec niri msg action close-window --id "$window_id"
+fi
+
+exec niri msg action focus-window --id "$window_id"

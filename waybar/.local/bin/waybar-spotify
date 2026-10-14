@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+
+case "${1:-status}" in
+  heart)
+    exec /home/hassan/.local/bin/waybar-spotify-heart
+    ;;
+  like)
+    # Spotify does not expose library changes through MPRIS. Use its native
+    # Alt+Shift+B shortcut, briefly focusing its Xwayland window on niri.
+    exec 9>"${XDG_RUNTIME_DIR:-/tmp}/waybar-spotify-like-${UID}.lock"
+    flock -n 9 || exit 0
+    playerctl --player=spotify metadata xesam:url 2>/dev/null | grep -qE '(spotify:track:|open.spotify.com/track/)' || exit 0
+    windows=$(niri msg -j windows) || exit 1
+    window_id=$(jq -r 'map(select((.app_id // "" | ascii_downcase) == "spotify")) | first | .id // empty' <<<"$windows")
+    previous_id=$(jq -r '.[] | select(.is_focused) | .id' <<<"$windows")
+    [[ -n "$window_id" ]] || exit 0
+
+    restore_focus() {
+      # Do not steal focus back if the user switched windows during the action.
+      if [[ -n "$previous_id" && "$previous_id" != "$window_id" ]] &&
+         [[ $(niri msg -j focused-window 2>/dev/null | jq -r '.id // empty') == "$window_id" ]]; then
+        niri msg action focus-window --id "$previous_id" >/dev/null 2>&1 || true
+      fi
+    }
+    trap restore_focus EXIT
+    niri msg action focus-window --id "$window_id" || exit 1
+    sleep 0.2
+    [[ $(niri msg -j focused-window | jq -r '.id // empty') == "$window_id" ]] || exit 1
+    x_window=$(xdotool getwindowfocus) || exit 1
+    xprop -id "$x_window" WM_CLASS | grep -qi '"spotify"' || exit 1
+    xdotool key --clearmodifiers alt+shift+b || exit 1
+    sleep 0.15
+    exit
+    ;;
+  toggle)
+    if playerctl --player=spotify status >/dev/null 2>&1; then
+      playerctl --player=spotify play-pause
+    else
+      niri msg action spawn -- /snap/bin/spotify
+    fi
+    exit
+    ;;
+  next|previous)
+    playerctl --player=spotify "$1" >/dev/null 2>&1 || true
+    exit
+    ;;
+  open)
+    window_id=$(niri msg -j windows 2>/dev/null | jq -r '
+      map(select(.app_id | ascii_downcase == "spotify"))
+      | first
+      | .id // empty
+    ')
+    if [[ -n "$window_id" ]]; then
+      niri msg action focus-window --id "$window_id"
+    else
+      niri msg action spawn -- /snap/bin/spotify
+    fi
+    exit
+    ;;
+esac
+
+if ! status=$(playerctl --player=spotify status 2>/dev/null); then
+  jq -cn '{text:"", tooltip:"Spotify is not running\nClick to open", class:"stopped"}'
+  exit
+fi
+
+artist=$(playerctl --player=spotify metadata artist 2>/dev/null)
+title=$(playerctl --player=spotify metadata title 2>/dev/null)
+album=$(playerctl --player=spotify metadata album 2>/dev/null)
+
+if [[ -n "$artist" && -n "$title" ]]; then
+  text="  ${artist} — ${title}"
+else
+  text="  Spotify"
+fi
+
+jq -cn \
+  --arg text "$text" \
+  --arg tooltip "${status}: ${artist} — ${title}\n${album}" \
+  --arg class "${status,,}" \
+  '{text:$text, tooltip:$tooltip, class:$class}'

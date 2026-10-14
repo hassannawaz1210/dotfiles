@@ -1,0 +1,19 @@
+#!/usr/bin/env python3
+import json
+import subprocess
+import sys
+
+try:
+    tabs = json.loads(subprocess.check_output(
+        ["zellij", "action", "list-tabs", "--json"], text=True))
+    rows = [f"{t['position'] + 1}\t{t['name']}" for t in tabs]
+    result = subprocess.run(
+        ["fzf", "--delimiter=\t", "--with-nth=2..", "--layout=reverse",
+         "--prompt=Find tab > ", "--header=Enter: switch tab | Esc: cancel"],
+        input="\n".join(rows), text=True, stdout=subprocess.PIPE)
+    if result.returncode == 0:
+        index = result.stdout.split("\t", 1)[0]
+        subprocess.run(["zellij", "action", "go-to-tab", index], check=True)
+except (subprocess.CalledProcessError, ValueError, KeyError) as error:
+    print(f"Unable to list or switch Zellij tabs: {error}", file=sys.stderr)
+    sys.exit(1)

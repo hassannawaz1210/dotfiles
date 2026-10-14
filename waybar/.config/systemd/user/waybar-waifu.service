@@ -1,0 +1,13 @@
+[Unit]
+Description=Tiny Ayaka companion on Waybar
+After=waybar.service
+PartOf=waybar.service graphical-session.target
+
+[Service]
+ExecStart=/home/hassan/.local/bin/waybar-waifu
+Environment=GDK_BACKEND=wayland
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=waybar.service
